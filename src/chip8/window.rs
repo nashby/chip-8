@@ -24,8 +24,7 @@ impl Window {
         panic!("{}", e);
     });
 
-    // Limit to max ~60 fps update rate
-    window.set_target_fps(60);
+    window.set_target_fps(120);
 
     Self {
       window,

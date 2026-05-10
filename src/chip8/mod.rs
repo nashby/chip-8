@@ -12,8 +12,8 @@ pub struct Chip8 {
   pub program_counter: u16,
 
   //stack
-  stack: [u16; 16],
-  stack_pointer: u8,
+  pub stack: [u16; 16],
+  pub stack_pointer: usize,
 
   //timers
   delay_timer: u8,
@@ -64,13 +64,32 @@ impl Chip8 {
 
 
     match nibbles {
-        (0x0, 0x0, 0xE, 0x0) => self.op_cls(window),
-        (0x1, _, _, _) => self.op_jp(nnn),
-        (0x6, _, _, _) => self.op_ld_imm(x, nn),
-        (0x7, _, _, _) => self.op_add_imm(x, nn),
-        (0xA, _, _, _) => self.op_ld_i(nnn),
-        (0xD, _, _, _) => self.op_drw(x, y, n),
-        _ => panic!("unknown opcode: {:04X}", opcode),
+      (0x0, 0x0, 0xE, 0x0) => self.op_cls(window),
+      (0x0, 0x0, 0xE, 0xE) => self.op_rtn(),
+      (0x1, _, _, _) => self.op_jp(nnn),
+      (0x2, _, _, _) => self.op_call(nnn),
+      (0x3, _, _, _) => self.op_skp_imm_if(x, nn),
+      (0x4, _, _, _) => self.op_skp_imm_unless(x, nn),
+      (0x5, _, _, 0x0) => self.op_skp_reg_if(x, y),
+      (0x6, _, _, _) => self.op_ld_imm(x, nn),
+      (0x7, _, _, _) => self.op_add_imm(x, nn),
+      (0x8, _, _, 0x0) => self.op_reg_assign(x, y),
+      (0x8, _, _, 0x1) => self.op_reg_or(x, y),
+      (0x8, _, _, 0x2) => self.op_reg_and(x, y),
+      (0x8, _, _, 0x3) => self.op_reg_xor(x, y),
+      (0x8, _, _, 0x4) => self.op_reg_add(x, y),
+      (0x8, _, _, 0x5) => self.op_reg_sub(x, y),
+      (0x8, _, _, 0x6) => self.op_reg_right_move(x, y),
+      (0x8, _, _, 0x7) => self.op_reg_sub_reverse(x, y),
+      (0x8, _, _, 0xE) => self.op_reg_left_move(x, y),
+      (0x9, _, _, 0x0) => self.op_skp_reg_unless(x, y),
+      (0xA, _, _, _) => self.op_ld_i(nnn),
+      (0xD, _, _, _) => self.op_drw(x, y, n),
+      (0xF, _, 0x1, 0xE) => self.op_add_ir(x),
+      (0xF, _, 0x3, 0x3) => self.op_bcd_reg(x),
+      (0xF, _, 0x5, 0x5) => self.op_save_reg(x),
+      (0xF, _, 0x6, 0x5) => self.op_ld_reg(x),
+      _ => panic!("unknown opcode: {:04X}", opcode),
     }
   }
 
@@ -78,8 +97,130 @@ impl Chip8 {
       window.clear(0);
   }
 
+  fn op_call(&mut self, nnn: u16) {
+    self.stack[self.stack_pointer] = self.program_counter;
+    self.stack_pointer += 1;
+
+    self.program_counter = nnn;
+  }
+
+  fn op_add_ir(&mut self, x: usize) {
+    let (result, _carry) = self.index_register.overflowing_add(self.v_registers[x] as u16);
+    self.index_register = result;
+  }
+
+  fn op_bcd_reg(&mut self, x: usize) {
+    let mut val = self.v_registers[x];
+    let mut digits: [u8; 3] = [0; 3];
+    let mut i: usize = 3;
+
+    while val > 0 {
+      i -= 1;
+      digits[i] = val % 10;
+      val /= 10;
+    }
+
+    println!("!!!!!!!");
+    println!("{}", val);
+    dbg!(self.v_registers[x]);
+    dbg!(digits);
+
+    for i in 0..=2 as u16 {
+      self.memory[(self.index_register + i) as usize] = digits[i as usize];
+    }
+  }
+
+  fn op_save_reg(&mut self, x: usize) {
+    for i in 0..=x as u16 {
+      self.memory[(self.index_register + i) as usize] = self.v_registers[i as usize]
+    }
+  }
+
+  fn op_ld_reg(&mut self, x: usize) {
+    for i in 0..=x as u16 {
+      self.v_registers[i as usize] = self.memory[(self.index_register + i) as usize]
+    }
+  }
+
+  fn op_reg_assign(&mut self, x: usize, y: usize) {
+    self.v_registers[x] = self.v_registers[y];
+  }
+
+  fn op_reg_or(&mut self, x: usize, y: usize) {
+    self.v_registers[x] |= self.v_registers[y];
+  }
+
+  fn op_reg_and(&mut self, x: usize, y: usize) {
+    self.v_registers[x] &= self.v_registers[y];
+  }
+
+  fn op_reg_xor(&mut self, x: usize, y: usize) {
+    self.v_registers[x] ^= self.v_registers[y];
+  }
+
+  fn op_reg_add(&mut self, x: usize, y: usize) {
+    let (result, carry) = self.v_registers[x].overflowing_add(self.v_registers[y]);
+    self.v_registers[x] = result;
+    self.v_registers[0xF] = if carry { 1 } else { 0 };
+  }
+
+  fn op_reg_sub(&mut self, x: usize, y: usize) {
+     let (result, borrow) = self.v_registers[x].overflowing_sub(self.v_registers[y]);
+     self.v_registers[x] = result;
+     self.v_registers[0xF] = if borrow { 0 } else { 1 };
+  }
+
+  fn op_reg_sub_reverse(&mut self, x: usize, y: usize) {
+     let (result, borrow) = self.v_registers[y].overflowing_sub(self.v_registers[x]);
+     self.v_registers[x] = result;
+     self.v_registers[0xF] = if borrow { 0 } else { 1 };
+  }
+
+  fn op_reg_right_move(&mut self, x: usize, y: usize) {
+     let old_sgb = self.v_registers[y] & 0x1;
+     let (result, _borrow) = self.v_registers[y].overflowing_shr(1);
+     self.v_registers[x] = result;
+     self.v_registers[0xF] = old_sgb;
+  }
+
+  fn op_reg_left_move(&mut self, x: usize, y: usize) {
+     let old_sgb = self.v_registers[y] & 0x0001;
+     let (result, _borrow) = self.v_registers[y].overflowing_shl(1);
+     self.v_registers[x] = result;
+     self.v_registers[0xF] = old_sgb;
+  }
+
+  fn op_rtn(&mut self) {
+    self.stack_pointer -= 1;
+    self.program_counter = self.stack[self.stack_pointer];
+  }
+
   fn op_jp(&mut self, nnn: u16) {
     self.program_counter = nnn;
+  }
+
+  fn op_skp_imm_if(&mut self, x: usize, nn: u8) {
+    if self.v_registers[x] == nn {
+      self.program_counter += 2;
+    }
+  }
+
+  fn op_skp_imm_unless(&mut self, x: usize, nn: u8) {
+    if self.v_registers[x] != nn {
+      self.program_counter += 2;
+    }
+  }
+
+  fn op_skp_reg_if(&mut self, x: usize, y: usize) {
+    if self.v_registers[x] == self.v_registers[y] {
+      self.program_counter += 2;
+    }
+  }
+
+  fn op_skp_reg_unless(&mut self, x: usize, y: usize) {
+    if self.v_registers[x] != self.v_registers[y] {
+      self.program_counter += 2;
+    }
   }
 
   fn op_ld_imm(&mut self, x: usize, nn: u8) {
@@ -87,7 +228,7 @@ impl Chip8 {
   }
 
   fn op_add_imm(&mut self, x: usize, nn: u8) {
-    self.v_registers[x] += nn;
+    self.v_registers[x] = self.v_registers[x].wrapping_add(nn);
   }
 
   fn op_ld_i(&mut self, nnn: u16) {

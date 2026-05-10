@@ -11,10 +11,8 @@ fn main() {
     chip8.memory[font::FONT_START..font::FONT_START + font::FONT.len()].copy_from_slice(&font::FONT);
     chip8.memory[rom::ROM_START..rom::ROM_START + rom.data.len()].copy_from_slice(&rom.data);
 
-
     while window.is_open() {
         window.clear(0);
-        window.update();
 
         chip8.step(&mut window);
 
