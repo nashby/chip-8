@@ -120,11 +120,6 @@ impl Chip8 {
       val /= 10;
     }
 
-    println!("!!!!!!!");
-    println!("{}", val);
-    dbg!(self.v_registers[x]);
-    dbg!(digits);
-
     for i in 0..=2 as u16 {
       self.memory[(self.index_register + i) as usize] = digits[i as usize];
     }
@@ -177,17 +172,17 @@ impl Chip8 {
   }
 
   fn op_reg_right_move(&mut self, x: usize, y: usize) {
-     let old_sgb = self.v_registers[y] & 0x1;
+     let lsb = self.v_registers[x] & 0x01;
      let (result, _borrow) = self.v_registers[y].overflowing_shr(1);
      self.v_registers[x] = result;
-     self.v_registers[0xF] = old_sgb;
+     self.v_registers[0xF] = lsb;
   }
 
   fn op_reg_left_move(&mut self, x: usize, y: usize) {
-     let old_sgb = self.v_registers[y] & 0x0001;
+     let msb = self.v_registers[x] & 0x80;
      let (result, _borrow) = self.v_registers[y].overflowing_shl(1);
      self.v_registers[x] = result;
-     self.v_registers[0xF] = old_sgb;
+     self.v_registers[0xF] = msb;
   }
 
   fn op_rtn(&mut self) {

@@ -7,7 +7,7 @@ use chip8::Chip8;
 fn main() {
     let mut window = Window::new("Chip8");
     let mut chip8 = Chip8::new();
-    let mut rom = rom::Rom::load("corax+.ch8");
+    let mut rom = rom::Rom::load("flags.ch8");
     chip8.memory[font::FONT_START..font::FONT_START + font::FONT.len()].copy_from_slice(&font::FONT);
     chip8.memory[rom::ROM_START..rom::ROM_START + rom.data.len()].copy_from_slice(&rom.data);
 

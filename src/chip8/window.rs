@@ -36,10 +36,6 @@ impl Window {
       self.window.is_open() && !self.window.is_key_down(MiniKey::Escape)
   }
 
-  pub fn buffer_mut(&mut self) -> &mut [u32] {
-      &mut self.buffer
-  }
-
   pub fn clear(&mut self, color: u32) {
       for px in self.buffer.iter_mut() {
           *px = color;
