@@ -179,7 +179,7 @@ impl Chip8 {
   }
 
   fn op_reg_left_move(&mut self, x: usize, y: usize) {
-     let msb = self.v_registers[x] & 0x80;
+     let msb = (self.v_registers[x] & 0x80) >> 7;
      let (result, _borrow) = self.v_registers[y].overflowing_shl(1);
      self.v_registers[x] = result;
      self.v_registers[0xF] = msb;
