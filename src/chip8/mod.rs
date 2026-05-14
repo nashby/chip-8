@@ -1,6 +1,9 @@
 pub mod window;
 pub mod font;
 pub mod rom;
+pub mod rnd;
+
+pub const INSTRUCTIONS_PER_FRAME: usize = 10;
 
 pub struct Chip8 {
   pub memory: [u8; 4096],
@@ -20,7 +23,7 @@ pub struct Chip8 {
   sound_timer: u8,
 
   pub display_buffer: [u8; 64 * 32],
-  keypad: [bool; 16]
+  pub keypad: [bool; 16]
 }
 
 impl Chip8 {
@@ -36,6 +39,12 @@ impl Chip8 {
       sound_timer: 0,
       display_buffer: [0; 64 * 32],
       keypad: [false; 16],
+    }
+  }
+
+  pub fn tick_timers(&mut self) {
+    if self.delay_timer > 0 {
+      self.delay_timer -= 1;
     }
   }
 
@@ -84,9 +93,16 @@ impl Chip8 {
       (0x8, _, _, 0xE) => self.op_reg_left_move(x, y),
       (0x9, _, _, 0x0) => self.op_skp_reg_unless(x, y),
       (0xA, _, _, _) => self.op_ld_i(nnn),
+      (0xB, _, _, _) => self.op_jp_v0(nnn),
+      (0xC, _, _, _) => self.op_rnd_v(x, nnn),
       (0xD, _, _, _) => self.op_drw(x, y, n),
+      (0xE, _, 0x9, 0xE) => self.op_skp_if_key_pressed(x),
+      (0xE, _, 0xA, 0x1) => self.op_skp_unless_key_pressed(x),
+      (0xF, _, 0x0, 0xA) => self.op_wait_keypress(x),
+      (0xF, _, 0x1, 0x5) => self.op_load_delay(x),
       (0xF, _, 0x1, 0xE) => self.op_add_ir(x),
       (0xF, _, 0x3, 0x3) => self.op_bcd_reg(x),
+      (0xF, _, 0x0, 0x7) => self.op_read_delay(x),
       (0xF, _, 0x5, 0x5) => self.op_save_reg(x),
       (0xF, _, 0x6, 0x5) => self.op_ld_reg(x),
       _ => panic!("unknown opcode: {:04X}", opcode),
@@ -94,7 +110,7 @@ impl Chip8 {
   }
 
   fn op_cls(&mut self, window: &mut window::Window) {
-      window.clear(0);
+      self.display_buffer.fill(0);
   }
 
   fn op_call(&mut self, nnn: u16) {
@@ -104,9 +120,47 @@ impl Chip8 {
     self.program_counter = nnn;
   }
 
+  fn op_rnd_v(&mut self, x: usize, nnn: u16) {
+    self.v_registers[x] = (rnd::rand() & nnn) as u8;
+  }
+
+  fn op_wait_keypress(&mut self, x: usize) {
+    if let Some(key_pressed) = self.keypad.iter().position(|&r| r)  {
+      self.v_registers[x] = key_pressed as u8;
+    } else {
+      self.program_counter -= 2;
+    }
+  }
+
+  fn op_jp_v0(&mut self, nnn: u16) {
+    self.program_counter = nnn + self.v_registers[0] as u16;
+  }
+
   fn op_add_ir(&mut self, x: usize) {
     let (result, _carry) = self.index_register.overflowing_add(self.v_registers[x] as u16);
     self.index_register = result;
+  }
+
+  fn op_skp_if_key_pressed(&mut self, x: usize) {
+    let key = self.v_registers[x] & 0x0F;
+    if self.keypad[key as usize] {
+      self.program_counter += 2;
+    }
+  }
+
+  fn op_skp_unless_key_pressed(&mut self, x: usize) {
+    let key = self.v_registers[x] & 0x0F;
+    if !self.keypad[key as usize] {
+      self.program_counter += 2;
+    }
+  }
+
+  fn op_load_delay(&mut self, x: usize) {
+    self.delay_timer = self.v_registers[x];
+  }
+
+  fn op_read_delay(&mut self, x: usize) {
+    self.v_registers[x] = self.delay_timer;
   }
 
   fn op_bcd_reg(&mut self, x: usize) {

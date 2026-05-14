@@ -1,7 +1,7 @@
 use minifb::{Key as MiniKey, Window as MiniWindow, WindowOptions as MiniWindowOptions, Scale as MiniScale};
 
 pub struct Window {
-  window: MiniWindow,
+  pub window: MiniWindow,
   pub buffer: Vec<u32>
 }
 
@@ -24,7 +24,7 @@ impl Window {
         panic!("{}", e);
     });
 
-    window.set_target_fps(120);
+    window.set_target_fps(60);
 
     Self {
       window,
@@ -46,5 +46,9 @@ impl Window {
       self.window
           .update_with_buffer(&self.buffer, 64, 32)
           .unwrap();
+  }
+
+  pub fn get_keys(&mut self) -> Vec<MiniKey> {
+    return self.window.get_keys();
   }
 }
