@@ -48,7 +48,7 @@ impl Chip8 {
     }
   }
 
-  pub fn step(&mut self, window: &mut window::Window) {
+  pub fn step(&mut self) {
     // fetch
     let pc = self.program_counter as usize;
     let opcode = ((self.memory[pc] as u16) << 8) | (self.memory[pc + 1] as u16);
@@ -71,9 +71,8 @@ impl Chip8 {
     println!("opcode: {:04X}", opcode);
     println!("program_counter: {}", self.program_counter);
 
-
     match nibbles {
-      (0x0, 0x0, 0xE, 0x0) => self.op_cls(window),
+      (0x0, 0x0, 0xE, 0x0) => self.op_cls(),
       (0x0, 0x0, 0xE, 0xE) => self.op_rtn(),
       (0x1, _, _, _) => self.op_jp(nnn),
       (0x2, _, _, _) => self.op_call(nnn),
@@ -109,7 +108,7 @@ impl Chip8 {
     }
   }
 
-  fn op_cls(&mut self, window: &mut window::Window) {
+  fn op_cls(&mut self) {
       self.display_buffer.fill(0);
   }
 

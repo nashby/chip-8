@@ -4,25 +4,12 @@ use chip8::font;
 use chip8::rom;
 use chip8::Chip8;
 use std::collections::HashMap;
-use minifb::{InputCallback, Key};
-use std::{cell::RefCell, rc::Rc};
-
-type KeyVec = Rc<RefCell<Vec<u32>>>;
-struct Input {
-    keys: KeyVec,
-}
-
-impl InputCallback for Input {
-    /// Will be called every time a character key is pressed
-    fn add_char(&mut self, uni_char: u32) {
-        self.keys.borrow_mut().push(uni_char);
-    }
-}
+use minifb::Key;
 
 fn main() {
     let mut window = Window::new("Chip8");
     let mut chip8 = Chip8::new();
-    let rom = rom::Rom::load("stars.ch8");
+    let rom = rom::Rom::load("flags.ch8");
     chip8.memory[font::FONT_START..font::FONT_START + font::FONT.len()].copy_from_slice(&font::FONT);
     chip8.memory[rom::ROM_START..rom::ROM_START + rom.data.len()].copy_from_slice(&rom.data);
 
@@ -47,7 +34,7 @@ fn main() {
         }
 
         for _ in 0..chip8::INSTRUCTIONS_PER_FRAME {
-            chip8.step(&mut window);
+            chip8.step();
         };
 
         chip8.tick_timers();
@@ -56,11 +43,8 @@ fn main() {
             .display_buffer
             .iter()
             .map(|&pixel| {
-                if pixel == 0 {
-                    0x00000000 // black
-                } else {
-                    0xFFFFFFFF // white
-                }
+                if pixel == 0 { 0x00000000 }
+                else { 0xFFFFFFFF }
             })
             .collect();
 
